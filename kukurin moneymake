@@ -1,0 +1,161 @@
+--[[
+    MAGICAL MONEY MAKER v11
+    - Lower hover height (10 studs)
+    - Balanced speed (2.5 seconds total)
+--]]
+
+-- ====== SERVICES ======
+local Players           = game:GetService("Players")
+local RunService        = game:GetService("RunService")
+local LocalPlayer       = Players.LocalPlayer
+
+-- ====== STATE ======
+local isMakingMoney = false
+
+-- ====== UI SETUP ======
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MagicalMoneyMaker"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.DisplayOrder = 2147483647
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 100)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -50)
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 18, 42)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ZIndex = 2147483647
+MainFrame.Parent = ScreenGui
+local ms = Instance.new("UIStroke", MainFrame)
+ms.Color = Color3.fromRGB(70, 45, 110)
+ms.Thickness = 1
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 25)
+Title.BackgroundColor3 = Color3.fromRGB(35, 20, 60)
+Title.BorderSizePixel = 0
+Title.Text = "Magical Money"
+Title.TextColor3 = Color3.fromRGB(200, 140, 255)
+Title.TextSize = 12
+Title.Font = Enum.Font.GothamBold
+Title.ZIndex = 2147483647
+Title.Parent = MainFrame
+
+local MakeMoneyBtn = Instance.new("TextButton")
+MakeMoneyBtn.Size = UDim2.new(1, -20, 0, 40)
+MakeMoneyBtn.Position = UDim2.new(0, 10, 0, 40)
+MakeMoneyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+MakeMoneyBtn.Text = "Make Money"
+MakeMoneyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MakeMoneyBtn.TextSize = 16
+MakeMoneyBtn.Font = Enum.Font.GothamBold
+MakeMoneyBtn.BorderSizePixel = 0
+MakeMoneyBtn.ZIndex = 2147483647
+MakeMoneyBtn.Parent = MainFrame
+
+local bc = Instance.new("UICorner", MakeMoneyBtn)
+bc.CornerRadius = UDim.new(0, 6)
+
+-- ====== LOGIC ======
+local function makeMoney()
+    if isMakingMoney then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local myRoot = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not myRoot then return end
+    
+    isMakingMoney = true
+    MakeMoneyBtn.Text = "Making Money..."
+    MakeMoneyBtn.BackgroundColor3 = Color3.fromRGB(150, 30, 30)
+    
+    local targetPart = myRoot
+    local vehicleModel = nil
+    local seatPart = hum.SeatPart
+    
+    if seatPart then
+        vehicleModel = seatPart:FindFirstAncestorOfClass("Model")
+        if vehicleModel then
+            targetPart = vehicleModel.PrimaryPart or vehicleModel:FindFirstChildWhichIsA("BasePart")
+        end
+    end
+    
+    if not targetPart then 
+        isMakingMoney = false
+        return 
+    end
+
+    -- Unanchor parts so it can fly
+    local partsToAnchor = {}
+    if vehicleModel then
+        for _, part in ipairs(vehicleModel:GetDescendants()) do
+            if part:IsA("BasePart") and part.Anchored then
+                part.Anchored = false
+                table.insert(partsToAnchor, part)
+            end
+        end
+    end
+    
+    local startPos = targetPart.Position
+    local hoverHeight = startPos.Y + 10 -- MIDDLE GROUND: 10 studs
+    local startY = select(2, targetPart.CFrame:ToEulerAnglesYXZ())
+    
+    -- Push up smoothly
+    local bv = Instance.new("BodyVelocity")
+    bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+    bv.Velocity = Vector3.new(0, 50, 0)
+    bv.Parent = targetPart
+    
+    local elapsed = 0
+    local duration = 2.5 -- BALANCED: 2.5 seconds
+    local totalAngle = 9 * math.pi * 2
+    
+    local connection
+    connection = RunService.RenderStepped:Connect(function(dt)
+        elapsed = elapsed + dt
+        
+        if elapsed >= duration then
+            connection:Disconnect()
+            bv:Destroy()
+            
+            -- Re-anchor
+            for _, part in ipairs(partsToAnchor) do
+                if part and part.Parent then part.Anchored = true end
+            end
+            
+            isMakingMoney = false
+            MakeMoneyBtn.Text = "Make Money"
+            MakeMoneyBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            return
+        end
+        
+        -- Vertical movement (adjusted for 2.5s)
+        if elapsed < 0.4 then
+            bv.Velocity = Vector3.new(0, 50, 0)
+        elseif elapsed < 2.0 then
+            local currentY = targetPart.Position.Y
+            if currentY < hoverHeight then
+                bv.Velocity = Vector3.new(0, 15, 0)
+            else
+                bv.Velocity = Vector3.new(0, 0, 0)
+            end
+        else
+            bv.Velocity = Vector3.new(0, -50, 0)
+        end
+        
+        -- Apply direct CFrame rotation to the vehicle's root part
+        local progress = elapsed / duration
+        local currentAngle = startY + (progress * totalAngle)
+        
+        targetPart.CFrame = CFrame.new(targetPart.Position) * CFrame.Angles(0, currentAngle, 0)
+    end)
+end
+
+MakeMoneyBtn.MouseButton1Click:Connect(makeMoney)
+
+print("✦ Magical Money Maker v11 Loaded ✦")
